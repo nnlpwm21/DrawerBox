@@ -551,6 +551,90 @@ public static class ShortcutHelper
         InvalidateStoredMetadataCache(normalizedShortcutPath);
     }
 
+    public static void CreateOrUpdateShortcut(
+        string shortcutPath,
+        string targetPath,
+        string description)
+    {
+        if (string.IsNullOrWhiteSpace(shortcutPath))
+        {
+            throw new ArgumentException("Shortcut path must include a directory.", nameof(shortcutPath));
+        }
+
+        string normalizedShortcutPath = Path.GetFullPath(shortcutPath);
+        string normalizedTargetPath = Path.GetFullPath(targetPath);
+        string? shortcutDirectory = Path.GetDirectoryName(normalizedShortcutPath);
+        if (string.IsNullOrWhiteSpace(shortcutDirectory))
+        {
+            throw new ArgumentException("Shortcut path must include a directory.", nameof(shortcutPath));
+        }
+
+        Directory.CreateDirectory(shortcutDirectory);
+
+#if DESKBOXWHITE_NATIVE_AOT
+        var metadata = new ShortcutInfo(
+            normalizedTargetPath,
+            description,
+            string.Empty,
+            Path.GetDirectoryName(normalizedTargetPath) ?? normalizedTargetPath,
+            string.Empty,
+            0);
+        ShortcutNativeWriteCallResult native =
+            ShortcutNativeBackend.WriteShortcut(normalizedShortcutPath, metadata);
+        if (!native.Success)
+        {
+            LogNativeWriteFailure("write", normalizedShortcutPath, native);
+            throw new InvalidOperationException(
+                $"Rust shortcut write failed: {native.Failure}; {native.Detail}");
+        }
+#else
+        if (ShortcutBackendPolicy.Current == ShortcutBackendMode.Rust)
+        {
+            var metadata = new ShortcutInfo(
+                normalizedTargetPath,
+                description,
+                string.Empty,
+                Path.GetDirectoryName(normalizedTargetPath) ?? normalizedTargetPath,
+                string.Empty,
+                0);
+            ShortcutNativeWriteCallResult native =
+                ShortcutNativeBackend.WriteShortcut(normalizedShortcutPath, metadata);
+            if (!native.Success)
+            {
+                LogNativeWriteFailure("write", normalizedShortcutPath, native);
+                throw new InvalidOperationException(
+                    $"Rust shortcut write failed: {native.Failure}; {native.Detail}");
+            }
+        }
+        else
+        {
+            CreateOrUpdateShortcutWithCSharp(
+                normalizedShortcutPath,
+                normalizedTargetPath,
+                description);
+        }
+#endif
+
+        InvalidateStoredMetadataCache(normalizedShortcutPath);
+    }
+
+    internal static void CreateOrUpdateShortcutWithCSharp(
+        string normalizedShortcutPath,
+        string normalizedTargetPath,
+        string description)
+    {
+        var link = (IShellLinkW)new ShellLink();
+        var file = (IPersistFile)link;
+        link.SetPath(normalizedTargetPath);
+        string? workingDir = Path.GetDirectoryName(normalizedTargetPath);
+        if (!string.IsNullOrWhiteSpace(workingDir))
+        {
+            link.SetWorkingDirectory(workingDir);
+        }
+        link.SetDescription(description);
+        file.Save(normalizedShortcutPath, true);
+    }
+
     /// <summary>
     /// Creates a filesystem .lnk whose target is an application object in the
     /// AppsFolder Shell namespace. Packaged applications do not expose a stable

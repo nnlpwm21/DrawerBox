@@ -643,6 +643,11 @@ settings.WeatherRefreshIntervalMinutes = 60;
         settings.SearchPopupCustomY = null;
         settings.SearchPopupCustomWidth = null;
         settings.SearchPopupCustomHeight = null;
+        ShortcutDrawerSettingsSlice drawer = settings.ShortcutDrawer;
+        drawer.ShortcutDrawerHotkeyEnabled = true;
+        drawer.ShortcutDrawerHotkeyModifiers =
+            (int)(HotkeyModifierKeys.Control | HotkeyModifierKeys.Alt);
+        drawer.ShortcutDrawerHotkeyKey = 0x44;
         settings.TodoNewTaskPosition = TodoNewTaskPositionTop;
         settings.TodoDefaultFilter = TodoDefaultFilterAll;
         settings.TodoTabStyle = WidgetTabStyleButton;

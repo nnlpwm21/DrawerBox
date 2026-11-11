@@ -154,6 +154,8 @@ public sealed partial class SettingsWindow
         FindCreatedSectionElement<global::DeskBoxWhite.Views.SettingsSections.GlanceWidgetSettingsSection>("GlanceSettings", "GlanceSettingsSection")!;
     private global::DeskBoxWhite.Views.SettingsSections.SearchSettingsSection SearchSettingsSection =>
         FindCreatedSectionElement<global::DeskBoxWhite.Views.SettingsSections.SearchSettingsSection>("SearchSettings", "SearchSettingsSection")!;
+    private global::DeskBoxWhite.Views.SettingsSections.ShortcutDrawerSettingsSection ShortcutDrawerSettingsSection =>
+        FindCreatedSectionElement<global::DeskBoxWhite.Views.SettingsSections.ShortcutDrawerSettingsSection>("ShortcutDrawerSettings", "ShortcutDrawerSettingsSection")!;
     private global::Microsoft.UI.Xaml.Controls.StackPanel PerformanceSettingsSection =>
         FindCreatedSectionElement<global::Microsoft.UI.Xaml.Controls.StackPanel>("PerformanceSettings", "PerformanceSettingsSection")!;
     private global::Microsoft.UI.Xaml.Controls.StackPanel MaintenanceSection =>

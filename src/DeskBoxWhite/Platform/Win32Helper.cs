@@ -822,6 +822,25 @@ public static partial class Win32Helper
 
     public const int HTCLIENT = 1;
     public const int HTCAPTION = 2;
+    public const int WM_NCLBUTTONDOWN = 0x00A1;
+
+    /// <summary>
+    /// Starts a native modal window drag for a borderless window. Releasing the
+    /// mouse capture first hands the drag loop to the shell, so snapping and
+    /// multi-monitor drags behave exactly like a normal caption drag.
+    /// </summary>
+    public static void BeginWindowMove(IntPtr hWnd)
+    {
+        ReleaseCapture();
+        SendMessageW(hWnd, WM_NCLBUTTONDOWN, (nuint)HTCAPTION, IntPtr.Zero);
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ReleaseCapture();
+
+    [LibraryImport("user32.dll", EntryPoint = "SendMessageW")]
+    private static partial IntPtr SendMessageW(IntPtr hWnd, uint msg, nuint wParam, IntPtr lParam);
     public const int HTLEFT = 10;
     public const int HTRIGHT = 11;
     public const int HTTOP = 12;

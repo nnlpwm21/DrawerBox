@@ -1,4 +1,4 @@
-﻿// Copyright (c) DeskBoxWhite. All rights reserved.
+// Copyright (c) DeskBoxWhite. All rights reserved.
 
 using CommunityToolkit.Mvvm.Input;
 using DeskBoxWhite.Controls.WidgetContents;
@@ -17,6 +17,7 @@ using H.NotifyIcon.Core;
 using Microsoft.Windows.AppLifecycle;
 using Microsoft.Windows.AppNotifications;
 using Microsoft.UI.Windowing;
+using Windows.Graphics;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Win32;
@@ -135,6 +136,8 @@ public partial class App : Application
     private FileMetaService? _fileMetaService;
     private SearchHotkeyService? _searchHotkeyService;
     private SearchPopupWindow? _searchPopupWindow;
+    private ShortcutDrawerHotkeyService? _shortcutDrawerHotkeyService;
+    private readonly Dictionary<Guid, ShortcutDrawerWindow> _shortcutDrawerWindows = new();
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _visibleIdleMemoryMaintenanceTimer;
     private int _visibleIdleMemoryMaintenanceRunning;
     private readonly VisibleIdleMemoryTracker _visibleIdleMemoryTracker = new(
@@ -1079,6 +1082,8 @@ public partial class App : Application
                 Log("[Search] Feature disabled; search services were not initialized");
             }
 
+            RunOptionalStartupStep("shortcut-drawer-shell", EnsureShortcutDrawerServices);
+
             RunCriticalStartupStep("widget-manager", () =>
             {
                 WidgetManager = new WidgetManager(SettingsService, FileService, OrganizerService,
@@ -1550,6 +1555,7 @@ public partial class App : Application
                 GlobalHotkeyService?.RefreshRegistration();
                 DesktopDoubleClickActivationService?.RefreshRegistration();
                 _searchHotkeyService?.RefreshRegistration();
+                RefreshShortcutDrawerHotkeys();
             }
             catch (Exception ex)
             {
@@ -4655,6 +4661,7 @@ public partial class App : Application
                 shutdownGrace),
             // Hooks must be removed while their owning tray window still exists.
             ShutdownStep.Sync("global-hotkey", () => { GlobalHotkeyService?.Dispose(); GlobalHotkeyService = null; }),
+            ShutdownStep.Sync("shortcut-drawer", () => { DisposeShortcutDrawerServices(); }),
             ShutdownStep.Sync("widgets", () => WidgetManager?.CloseAll()),
             ShutdownStep.Sync("desktop-organization-window", () => { _desktopOrganizationWindow?.CloseForShutdown(); _desktopOrganizationWindow = null; }),
             ShutdownStep.Sync("settings-window", () => { _settingsWindow?.CloseForShutdown(); _settingsWindow = null; }),
@@ -4852,6 +4859,262 @@ public partial class App : Application
         ScheduleLightMemoryCleanup(completedHeavyOperation: true);
     }
 
+    // ─── Shortcut Drawer Services ───────────────────────────────────
+
+    public ShortcutDrawerHotkeyService? ShortcutDrawerHotkeyService => _shortcutDrawerHotkeyService;
+
+    private void EnsureShortcutDrawerServices()
+    {
+        try
+        {
+            if (_shortcutDrawerHotkeyService is null)
+            {
+                _shortcutDrawerHotkeyService = new ShortcutDrawerHotkeyService(
+                    SettingsService,
+                    LocalizationService,
+                    (drawerId) => ToggleShortcutDrawerAsync(drawerId),
+                    () => GlobalHotkeyService?.CurrentGesture,
+                    () => SearchHotkeyService?.CurrentGesture,
+                    UiDispatcherQueue);
+                if (_trayWindow is not null)
+                {
+                    var trayHwnd = WindowNative.GetWindowHandle(_trayWindow);
+                    if (trayHwnd != IntPtr.Zero)
+                    {
+                        _shortcutDrawerHotkeyService.Attach(trayHwnd);
+                        Log("[ShortcutDrawer] Hotkey service attached");
+                    }
+                }
+            }
+
+            RefreshShortcutDrawerHotkeys();
+        }
+        catch (Exception ex)
+        {
+            Log($"[ShortcutDrawer] Hotkey service initialization failed: {ex}");
+            _shortcutDrawerHotkeyService?.Dispose();
+            _shortcutDrawerHotkeyService = null;
+        }
+    }
+
+    /// <summary>
+    /// Re-reads the drawer layout and re-registers every enabled per-drawer
+    /// global hotkey. Safe to call from the settings UI after edits.
+    /// </summary>
+    /// <summary>
+    /// Raised when drawer layout settings change (icon size, spacing), so an open
+    /// drawer window can refresh without reading the store on a timer.
+    /// </summary>
+    public static event EventHandler? ShortcutDrawerLayoutChanged;
+
+    /// <summary>
+    /// Tells an open drawer window that its layout settings changed.
+    /// </summary>
+    public static void NotifyShortcutDrawerLayoutChanged()
+    {
+        var handler = ShortcutDrawerLayoutChanged;
+        if (handler is null)
+        {
+            return;
+        }
+
+        try
+        {
+            handler(null, EventArgs.Empty);
+        }
+        catch (Exception ex)
+        {
+            Log($"[ShortcutDrawer] Layout change notification failed: {ex.Message}");
+        }
+    }
+
+    public void RefreshShortcutDrawerHotkeys()
+    {
+        var service = _shortcutDrawerHotkeyService;
+        if (service is null)
+        {
+            return;
+        }
+
+        _ = RefreshShortcutDrawerHotkeysAsync(service);
+    }
+
+    private async Task RefreshShortcutDrawerHotkeysAsync(ShortcutDrawerHotkeyService service)
+    {
+        try
+        {
+            var data = await new ShortcutDrawerStore().LoadAsync();
+            service.RefreshAllRegistrations(data);
+        }
+        catch (Exception ex)
+        {
+            Log($"[ShortcutDrawer] Failed to refresh hotkeys: {ex}");
+        }
+    }
+
+    private void DisposeShortcutDrawerServices()
+    {
+        foreach (ShortcutDrawerWindow window in _shortcutDrawerWindows.Values.ToArray())
+        {
+            try
+            {
+                window.Close();
+            }
+            catch (Exception ex)
+            {
+                Log($"[ShortcutDrawer] Window close failed during cleanup: {ex.Message}");
+            }
+        }
+
+        _shortcutDrawerWindows.Clear();
+        _shortcutDrawerHotkeyService?.Dispose();
+        _shortcutDrawerHotkeyService = null;
+        Log("[ShortcutDrawer] Services disposed");
+    }
+
+    private async Task ToggleShortcutDrawerAsync(Guid drawerId)
+    {
+        if (!UiDispatcherQueue.HasThreadAccess)
+        {
+            UiDispatcherQueue.TryEnqueue(() => _ = ToggleShortcutDrawerAsync(drawerId));
+            return;
+        }
+
+        // An empty id is the drawer-wide hotkey: it opens every drawer, so one
+        // gesture brings the whole set up (and a second press takes it down).
+        if (drawerId == Guid.Empty)
+        {
+            await ToggleAllShortcutDrawersAsync();
+            return;
+        }
+
+        if (TryGetShortcutDrawerWindow(drawerId) is { IsPopupVisible: true } open && !open.IsClosed)
+        {
+            open.HidePopup();
+            return;
+        }
+
+        OpenShortcutDrawer(drawerId);
+    }
+
+    /// <summary>
+    /// Opens every drawer at once, or closes them all when they are already up.
+    /// </summary>
+    private async Task ToggleAllShortcutDrawersAsync()
+    {
+        List<Guid> ids;
+        try
+        {
+            var data = await new ShortcutDrawerStore().LoadAsync();
+            ids = data.Drawers
+                .Where(drawer => drawer?.Id is { } id && id != Guid.Empty)
+                .Select(drawer => drawer.Id)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[ShortcutDrawer] Failed to read the drawer list: {ex}");
+            return;
+        }
+
+        if (ids.Count == 0)
+        {
+            return;
+        }
+
+        bool anyVisible = ids
+            .Select(TryGetShortcutDrawerWindow)
+            .Any(window => window is { IsPopupVisible: true });
+        if (anyVisible)
+        {
+            foreach (Guid id in ids)
+            {
+                TryGetShortcutDrawerWindow(id)?.HidePopup();
+            }
+
+            return;
+        }
+
+        foreach (Guid id in ids)
+        {
+            OpenShortcutDrawer(id);
+            await Task.Delay(40);
+        }
+    }
+
+    private async Task ToggleShortcutDrawerAsync() => await ToggleShortcutDrawerAsync(Guid.Empty);
+
+    /// <summary>
+    /// Public entry point used by the tray menu and settings. Unlike the global
+    /// hotkey this is idempotent: repeat invocations only focus the drawer.
+    /// </summary>
+    public void OpenShortcutDrawer(Guid drawerId = default)
+    {
+        CancelBackgroundMemoryCleanup();
+
+        ShortcutDrawerWindow? window = TryGetShortcutDrawerWindow(drawerId);
+        if (window is null || window.IsClosed)
+        {
+            window = CreateShortcutDrawerWindow(drawerId);
+        }
+
+        window.ShowPopup(drawerId);
+    }
+
+    /// <summary>
+    /// Bounds of the other open drawer popups, used for edge snapping while one
+    /// of them is dragged or resized.
+    /// </summary>
+    public List<RectInt32> GetOpenDrawerBoundsExcept(Guid drawerId)
+    {
+        var bounds = new List<RectInt32>();
+        foreach ((Guid id, ShortcutDrawerWindow window) in _shortcutDrawerWindows)
+        {
+            if (id == drawerId || window.IsClosed)
+            {
+                continue;
+            }
+
+            if (Win32Helper.GetWindowRect(window.WindowHandle, out var rect))
+            {
+                bounds.Add(new RectInt32(
+                    rect.Left,
+                    rect.Top,
+                    rect.Right - rect.Left,
+                    rect.Bottom - rect.Top));
+            }
+        }
+
+        return bounds;
+    }
+
+    private ShortcutDrawerWindow? TryGetShortcutDrawerWindow(Guid drawerId)
+    {
+        return _shortcutDrawerWindows.TryGetValue(drawerId, out ShortcutDrawerWindow? window) &&
+            !window.IsClosed
+            ? window
+            : null;
+    }
+
+    private ShortcutDrawerWindow CreateShortcutDrawerWindow(Guid drawerId)
+    {
+        var window = new ShortcutDrawerWindow(LocalizationService);
+        _shortcutDrawerWindows[drawerId] = window;
+        window.ItemActivated += (_, item) =>
+        {
+            window.HidePopup();
+            _ = window.OpenItemAsync(item);
+        };
+        window.Closed += (_, _) =>
+        {
+            _shortcutDrawerWindows.Remove(drawerId);
+            Log("[ShortcutDrawer] Window shell discarded; next open will recreate it");
+            ScheduleLightMemoryCleanup();
+        };
+
+        return window;
+    }
+
     private Task ToggleSearchPopupAsync()
     {
         if (!UiDispatcherQueue.HasThreadAccess)
@@ -4953,7 +5216,7 @@ public partial class App : Application
 
     private IReadOnlyList<IntPtr> GetRaisedBandAuxiliaryWindowHandles()
     {
-        List<IntPtr> handles = new(3);
+        List<IntPtr> handles = new(4);
         if (_settingsWindow is { IsVisibleToUser: true } settings)
         {
             handles.Add(WindowNative.GetWindowHandle(settings));
@@ -4962,6 +5225,14 @@ public partial class App : Application
         if (_searchPopupWindow is { IsPopupVisible: true } popup)
         {
             handles.Add(popup.WindowHandle);
+        }
+
+        foreach (ShortcutDrawerWindow drawer in _shortcutDrawerWindows.Values)
+        {
+            if (drawer.IsPopupVisible)
+            {
+                handles.Add(drawer.WindowHandle);
+            }
         }
 
         if (_desktopOrganizationWindow is { } organize)

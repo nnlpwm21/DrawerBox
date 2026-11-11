@@ -247,6 +247,18 @@ Text="DeskBoxWhite" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem
+                    x:Name="ShortcutDrawerNavItem"
+                    Tag="ShortcutDrawerSettings"
+                    svc:Localized.Key="Settings.ShortcutDrawer.Title">
+                    <NavigationViewItem.Icon>
+                        <ImageIcon Style="{StaticResource SettingsNavImageIconStyle}">
+                            <ImageIcon.Source>
+                                <media:SvgImageSource UriSource="ms-appx:///Assets/SettingsNavIcons/shortcut-drawer.svg" />
+                            </ImageIcon.Source>
+                        </ImageIcon>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem
                     Tag="Interaction"
                     svc:Localized.Key="Settings.Nav.Interaction">
                     <NavigationViewItem.Icon>
@@ -2364,6 +2376,9 @@ svc:Localized.DescriptionKey="Settings.DefaultWidth.Description"
                     </DataTemplate>
                     <DataTemplate x:Key="SearchSettingsSectionTemplate" x:DataType="viewModels:SettingsViewModel">
                         <sections:SearchSettingsSection x:Name="SearchSettingsSection" Visibility="Collapsed" />
+                    </DataTemplate>
+                    <DataTemplate x:Key="ShortcutDrawerSettingsSectionTemplate" x:DataType="viewModels:SettingsViewModel">
+                        <sections:ShortcutDrawerSettingsSection x:Name="ShortcutDrawerSettingsSection" Visibility="Collapsed" />
                     </DataTemplate>
                     <DataTemplate x:Key="PerformanceSettingsSectionTemplate" x:DataType="viewModels:SettingsViewModel">
                         <StackPanel

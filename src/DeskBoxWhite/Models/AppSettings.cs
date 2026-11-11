@@ -71,6 +71,9 @@ public class AppSettings
     [JsonIgnore]
     public SearchSettingsSlice Search { get; } = new();
 
+    [JsonIgnore]
+    public ShortcutDrawerSettingsSlice ShortcutDrawer { get; } = new();
+
     // ─── Serialization facade (wire contract, order-significant) ──
 
     /// <inheritdoc cref="CoreSettingsSlice.Theme"/>
@@ -744,6 +747,16 @@ public class AppSettings
 
     /// <inheritdoc cref="SearchSettingsSlice.SearchPopupCustomHeight"/>
     public int? SearchPopupCustomHeight { get => Search.SearchPopupCustomHeight; set => Search.SearchPopupCustomHeight = value; }
+
+    // ─── Shortcut Drawer ────────────────────────────────────────────────
+    /// <inheritdoc cref="ShortcutDrawerSettingsSlice.ShortcutDrawerHotkeyEnabled"/>
+    public bool ShortcutDrawerHotkeyEnabled { get => ShortcutDrawer.ShortcutDrawerHotkeyEnabled; set => ShortcutDrawer.ShortcutDrawerHotkeyEnabled = value; }
+
+    /// <inheritdoc cref="ShortcutDrawerSettingsSlice.ShortcutDrawerHotkeyModifiers"/>
+    public int ShortcutDrawerHotkeyModifiers { get => ShortcutDrawer.ShortcutDrawerHotkeyModifiers; set => ShortcutDrawer.ShortcutDrawerHotkeyModifiers = value; }
+
+    /// <inheritdoc cref="ShortcutDrawerSettingsSlice.ShortcutDrawerHotkeyKey"/>
+    public int ShortcutDrawerHotkeyKey { get => ShortcutDrawer.ShortcutDrawerHotkeyKey; set => ShortcutDrawer.ShortcutDrawerHotkeyKey = value; }
 
     // ─── Cloud Backup (roadmap §10 — non-secret provider config only) ───
 

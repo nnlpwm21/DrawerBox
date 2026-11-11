@@ -117,6 +117,7 @@ public sealed partial class SettingsWindow : Window
             ["WeatherSettings"] = new("WeatherSettings", "Settings.Weather.Title", "FeatureWidgets", "FeatureWidgets"),
             ["GlanceSettings"] = new("GlanceSettings", "Glance.Settings.Title", "FeatureWidgets", "FeatureWidgets"),
             ["SearchSettings"] = new("SearchSettings", "Settings.Search.Title", "FeatureWidgets", "FeatureWidgets"),
+            ["ShortcutDrawerSettings"] = new("ShortcutDrawerSettings", "Settings.ShortcutDrawer.Title", null, "ShortcutDrawerSettings"),
             ["AppearanceMaterialSettings"] = new("AppearanceMaterialSettings", "Settings.Material.Title", "Appearance", "Appearance"),
             ["AppearanceDensitySettings"] = new("AppearanceDensitySettings", "Settings.Density.Title", "Appearance", "Appearance"),
             ["AppearanceWindowSettings"] = new("AppearanceWindowSettings", "Settings.Group.AppVisual.Title", "Appearance", "Appearance"),
@@ -336,6 +337,7 @@ public sealed partial class SettingsWindow : Window
         _themeService.ApplyToWindow(this);
         _appWindow.Show();
         UpdateSearchSettingsActivity();
+        UpdateShortcutDrawerSettingsActivity();
         UpdateBackupSettingsActivity();
         // Route through the manager so a quick-reveal raised session (widget
         // group held topmost) lifts this window above the widgets instead of
@@ -424,6 +426,7 @@ public sealed partial class SettingsWindow : Window
         args.Cancel = true;
         _appWindow.Hide();
         UpdateSearchSettingsActivity();
+        UpdateShortcutDrawerSettingsActivity();
         UpdateBackupSettingsActivity();
         App.Current.WidgetManager?.ReleaseRaisedBandGuest(
             _hWnd,
@@ -443,6 +446,7 @@ public sealed partial class SettingsWindow : Window
 
         _isClosed = true;
         UpdateSearchSettingsActivity();
+        UpdateShortcutDrawerSettingsActivity();
         _searchSettingsViewModel.Dispose();
         _backupSettingsViewModel.Deactivate();
         Activated -= SettingsWindow_Activated;

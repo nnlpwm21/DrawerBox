@@ -36,6 +36,21 @@ public sealed partial class SettingsWindow
         {
             section.RefreshFromSettings();
         }
+        if (_currentSettingsSection == "ShortcutDrawerSettings" &&
+            _settingsSectionElements.TryGetValue("ShortcutDrawerSettings", out FrameworkElement? drawer) &&
+            drawer is ShortcutDrawerSettingsSection drawerSection)
+        {
+            drawerSection.RefreshFromSettings();
+        }
+    }
+
+    private void UpdateShortcutDrawerSettingsActivity()
+    {
+        if (_settingsSectionElements.TryGetValue("ShortcutDrawerSettings", out FrameworkElement? element) &&
+            element is ShortcutDrawerSettingsSection section)
+        {
+            section.SetActive(!_isClosed && IsVisibleToUser && _currentSettingsSection == "ShortcutDrawerSettings");
+        }
     }
 
     private void UpdateSearchSettingsActivity()
@@ -85,6 +100,9 @@ public sealed partial class SettingsWindow
         {
             case SearchSettingsSection searchSettings:
                 searchSettings.Configure(_searchSettingsViewModel, _localizationService, _hWnd);
+                break;
+            case ShortcutDrawerSettingsSection drawerSettings:
+                drawerSettings.Configure(_localizationService, _hWnd);
                 break;
             case FileWidgetSettingsSection fileSettings:
                 fileSettings.FileStack = _fileStackSettingsViewModel;

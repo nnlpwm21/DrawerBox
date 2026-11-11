@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using System.Reflection;
 using System.Reflection.Emit;
 using DeskBoxWhite.Models;
@@ -487,6 +487,17 @@ public sealed class ModuleBoundaryContractTests
         // a primary the same commit created — composite-save rollback inside
         // the store's owned surface.
         ["src/DeskBoxWhite/Services/ResilientJsonStore.cs"] = 9,
+        // +9: MoveShortcutsToDrawerAsync moves a drawer's links into another
+        // drawer, MoveShortcutsAsync moves a drawer's links into a folder the user
+        // picked, RemoveShortcut(s)Async deletes links inside the drawer folder
+        // the store owns, RenameDrawerAsync moves a drawer folder to match a
+        // renamed drawer, MigrateLegacyDrawerFolder merges a legacy folder into
+        // the store root, MoveDirectoryContents moves the legacy app-data drawer
+        // data into the managed storage root, RecoverIdNamedDrawerFoldersAsync
+        // pulls links out of the old id-named folders, and pack/import remove
+        // their own %TEMP% staging directory. All of it stays inside the store's
+        // own surface, never a user-file domain.
+        ["src/DeskBoxWhite/Services/ShortcutDrawerStore.cs"] = 9,
         ["src/DeskBoxWhite/Services/TodoWidgetStore.cs"] = 5,
         ["src/DeskBoxWhite/Services/VirtualDropFileNameResolver.cs"] = 1,
         ["src/DeskBoxWhite/Services/WidgetManager.FeatureWidgets.cs"] = 1,

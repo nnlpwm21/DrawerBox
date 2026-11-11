@@ -533,6 +533,7 @@ public sealed partial class SettingsWindow
             _ = ViewModel.RefreshQuickCaptureImageCacheInfoAsync();
         }
         UpdateSearchSettingsActivity();
+        UpdateShortcutDrawerSettingsActivity();
         UpdateBackupSettingsActivity();
         if (sectionTag == "GlanceSettings")
         {
